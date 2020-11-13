@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:cloudinary_sdk/src/models/cloudinary_delivery_type.dart';
 import 'package:cloudinary_sdk/src/models/cloudinary_resource_type.dart';
 import 'package:cloudinary_sdk/src/models/cloudinary_response.dart';
@@ -18,41 +20,38 @@ class CloudinaryClient extends CloudinaryApi {
     this._cloudName = cloudName;
   }
 
-  /// Uploads a file of [resourceType] with [fileName] to a [folder]
-  /// in your specified [cloudName]
-  ///
-  /// [resourceType] defaults to [CloudinaryResourceType.auto]
-  /// [fileName] is not mandatory, if not specified then a random name will be used
-  /// [optParams] a Map of optional parameters as defined in https://cloudinary.com/documentation/image_upload_api_reference
-  ///
-  /// Response:
-  /// Check all the atributes in the CloudinaryResponse to get the information you need... including secureUrl, publicId, etc.
-  Future<CloudinaryResponse> upload(String filePath,
-      {String fileName,
-      String folder,
-      CloudinaryResourceType resourceType,
-      Map<String, dynamic> optParams}) async {
+  Map<String, dynamic> _generateParams(Map<String, dynamic> params, {
+    String fileName,
+    String folder,
+    CloudinaryResourceType resourceType,
+    Map<String, dynamic> optParams
+  }) {
     int timeStamp = new DateTime.now().millisecondsSinceEpoch;
     resourceType ??= CloudinaryResourceType.auto;
 
     if (_apiSecret == null || _apiKey == null)
       throw Exception("apiKey and apiSecret must not be null");
 
-    if (filePath == null) throw Exception("filePath must not be null");
+    Map<String, dynamic> fullParams = {};
 
-    Map<String, dynamic> params = {};
-
-    if (fileName != null) params["public_id"] = fileName;
-    if (folder != null) params["folder"] = folder;
+    if (fileName != null) fullParams["public_id"] = fileName;
+    if (folder != null) fullParams["folder"] = folder;
 
     //Setting the optParams... this would override the public_id and folder if specified by user.
-    if (optParams != null) params.addAll(optParams);
-    params["api_key"] = _apiKey;
-    params["file"] = await MultipartFile.fromFile(filePath, filename: fileName);
-    params["timestamp"] = timeStamp;
-    params["signature"] =
-        getSignature(secret: _apiSecret, timeStamp: timeStamp, params: params);
+    if (optParams != null) fullParams.addAll(optParams);
+    fullParams["api_key"] = _apiKey;
 
+    fullParams["timestamp"] = timeStamp;
+    fullParams["signature"] =
+        getSignature(secret: _apiSecret, timeStamp: timeStamp, params: fullParams);
+
+    fullParams.addAll(params);
+    return fullParams;
+  }
+
+  Future<CloudinaryResponse> _upload(Map<String, dynamic> params, {
+    CloudinaryResourceType resourceType,
+  }) async {
     FormData formData = new FormData.fromMap(params);
 
     Response response;
@@ -71,6 +70,55 @@ class CloudinaryClient extends CloudinaryApi {
     if(cloudinaryResponse != null)
       cloudinaryResponse..statusCode = statusCode;
     return cloudinaryResponse;
+  }
+
+  /// Uploads a file of [resourceType] with [fileName] to a [folder]
+  /// in your specified [cloudName]
+  ///
+  /// [resourceType] defaults to [CloudinaryResourceType.auto]
+  /// [fileName] is not mandatory, if not specified then a random name will be used
+  /// [optParams] a Map of optional parameters as defined in https://cloudinary.com/documentation/image_upload_api_reference
+  ///
+  /// Response:
+  /// Check all the atributes in the CloudinaryResponse to get the information you need... including secureUrl, publicId, etc.
+  Future<CloudinaryResponse> uploadFile(String filePath,
+      {String fileName,
+      String folder,
+      CloudinaryResourceType resourceType,
+      Map<String, dynamic> optParams}) async {
+
+    if (filePath == null) throw Exception("filePath must not be null");
+    Map<String, dynamic> params = {};
+    params["file"] = await MultipartFile.fromFile(filePath, filename: fileName);
+
+    Map<String, dynamic> fullParams = _generateParams(params,
+        fileName: fileName,
+        folder: folder,
+        resourceType: resourceType,
+        optParams: optParams,
+    );
+
+    return _upload(fullParams, resourceType: resourceType);
+  }
+
+  Future<CloudinaryResponse> uploadByteData(ByteData byteData,
+      {String fileName,
+        String folder,
+        CloudinaryResourceType resourceType,
+        Map<String, dynamic> optParams}) async {
+
+    if (byteData == null) throw Exception("byteData must not be null");
+    Map<String, dynamic> params = {};
+    params["file"] = await MultipartFile.fromBytes(byteData.buffer.asUint8List(), filename: fileName);
+
+    Map<String, dynamic> fullParams = _generateParams(params,
+      fileName: fileName,
+      folder: folder,
+      resourceType: resourceType,
+      optParams: optParams,
+    );
+
+    return _upload(fullParams, resourceType: resourceType);
   }
 
   /// Deletes a file of [resourceType] with [publicId]

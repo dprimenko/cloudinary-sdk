@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:cloudinary_sdk/src/models/cloudinary_delivery_type.dart';
 import 'package:cloudinary_sdk/src/models/cloudinary_image.dart';
 import 'package:cloudinary_sdk/src/models/cloudinary_resource_type.dart';
@@ -31,7 +33,15 @@ class Cloudinary {
           String folder,
           CloudinaryResourceType resourceType,
           Map<String, dynamic> optParams}) =>
-      _client.upload(filePath,
+      _client.uploadFile(filePath,
+          fileName: fileName, folder: folder, resourceType: resourceType);
+
+  Future<CloudinaryResponse> uploadByteData(ByteData byteData,
+          {String fileName,
+          String folder,
+          CloudinaryResourceType resourceType,
+          Map<String, dynamic> optParams}) =>
+      _client.uploadByteData(byteData,
           fileName: fileName, folder: folder, resourceType: resourceType);
 
   /// This function uploads multiples files by calling uploadFile repeatedly
@@ -40,7 +50,7 @@ class Cloudinary {
       CloudinaryResourceType resourceType,
       Map<String, dynamic> optParams}) async {
     List<CloudinaryResponse> responses = await Future.wait(filePaths.map(
-        (filePath) async => await _client.upload(filePath,
+        (filePath) async => await _client.uploadFile(filePath,
             folder: folder,
             resourceType: resourceType,
             optParams: optParams))).catchError((err) => throw (err));
@@ -54,7 +64,7 @@ class Cloudinary {
     List<String> responses = List();
 
     for (var filePath in filePaths) {
-      CloudinaryResponse resp = await _client.upload(filePath,
+      CloudinaryResponse resp = await _client.uploadFile(filePath,
           folder: folder, resourceType: resourceType, optParams: optParams);
       responses.add(resp.url);
     }
